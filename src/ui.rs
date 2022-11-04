@@ -1,11 +1,11 @@
-use std::sync::mpsc::Receiver;
+use crate::line_manager::LineManager;
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
-use crate::line_manager::LineManager;
-use std::time::Duration;
 use std::io;
+use std::sync::mpsc::Receiver;
+use std::time::Duration;
 use tui::backend::CrosstermBackend;
 use tui::layout::{Constraint, Layout};
 use tui::style::{Color, Style};
@@ -72,7 +72,11 @@ pub fn start_ui(command_string: String, receiver: Receiver<String>) -> io::Resul
                 .collect::<Vec<ListItem>>();
 
             let list = List::new(list_items)
-                .block(Block::default().title(command_string.clone()).borders(Borders::ALL))
+                .block(
+                    Block::default()
+                        .title(command_string.clone())
+                        .borders(Borders::ALL),
+                )
                 .style(Style::default().fg(Color::White));
 
             f.render_widget(list, chunks[1]);

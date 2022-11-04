@@ -57,7 +57,12 @@ mod tests {
 
     #[test]
     fn processes_args() {
-        let command_args = vec!["rust_bin".to_string(), "/bin/ls".to_string(), "-la".to_string(), "./".to_string()];
+        let command_args = vec![
+            "rust_bin".to_string(),
+            "/bin/ls".to_string(),
+            "-la".to_string(),
+            "./".to_string(),
+        ];
 
         let (command, args, command_string) = process_args(command_args.iter().cloned());
 

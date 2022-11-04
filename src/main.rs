@@ -2,8 +2,7 @@ mod command_runner;
 mod line_manager;
 mod ui;
 
-use std::{io, env};
-
+use std::{env, io};
 
 fn main() -> io::Result<()> {
     let (command, args, command_string) = command_runner::process_args(env::args());
