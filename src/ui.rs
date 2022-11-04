@@ -55,7 +55,7 @@ pub fn start_ui(command_string: String, receiver: Receiver<String>) -> io::Resul
         };
 
         if let Some(new_line) = new_line_option {
-            manager.add_line(String::from(new_line))
+            manager.add_line(new_line)
         }
 
         let list_lines = manager.filter(filter.clone());
@@ -68,7 +68,7 @@ pub fn start_ui(command_string: String, receiver: Receiver<String>) -> io::Resul
             let list_items = list_lines
                 .iter()
                 .cloned()
-                .map(|x| ListItem::new(x))
+                .map(ListItem::new)
                 .collect::<Vec<ListItem>>();
 
             let list = List::new(list_items)

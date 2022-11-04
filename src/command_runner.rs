@@ -20,25 +20,17 @@ pub fn start_command(command: String, args: Vec<String>) -> Receiver<String> {
         let mut process = spawn_process(command, args);
 
         loop {
-            match process.stdout.as_mut() {
-                Some(out) => {
-                    let buf_reader = BufReader::new(out);
+            if let Some(out) = process.stdout.as_mut() {
+                let buf_reader = BufReader::new(out);
 
-                    for line in buf_reader.lines() {
-                        match line {
-                            Ok(l) => {
-                                send.send(l).unwrap_or(());
-                            }
-                            Err(_) => (),
-                        };
-                    }
+                for line in buf_reader.lines().flatten() {
+                    send.send(line).unwrap_or(());
                 }
-                None => (),
             }
         }
     });
 
-    return recv;
+    recv
 }
 
 fn spawn_process(command: String, args: Vec<String>) -> Child {
