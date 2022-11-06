@@ -13,7 +13,7 @@ pub fn process_args<T: Iterator<Item = String>>(mut cli_args: T) -> (String, Vec
     (command, args, command_string)
 }
 
-pub fn start_command(command: String, args: Vec<String>) -> Receiver<String> {
+pub fn run(command: String, args: Vec<String>) -> Receiver<String> {
     let (send, recv) = channel();
 
     thread::spawn(move || {

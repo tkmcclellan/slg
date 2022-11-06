@@ -9,32 +9,16 @@ use std::time::Duration;
 use tui::backend::CrosstermBackend;
 use tui::layout::{Constraint, Layout};
 use tui::style::{Color, Style};
-use tui::widgets::{Block, Borders, List, ListItem};
+use tui::widgets::{Block, Borders, List, ListItem, Widget};
 use tui::Terminal;
 use tui_textarea::{Input, Key, TextArea};
 
-fn create_text_area<'a>() -> TextArea<'a> {
-    let mut textarea = TextArea::default();
-    textarea.set_block(Block::default().borders(Borders::ALL).title("Search"));
-    textarea.set_style(Style::default().fg(Color::White));
-    textarea.set_cursor_line_style(Style::default());
-
-    textarea
-}
-
-pub fn start_ui(command_string: String, receiver: Receiver<String>) -> io::Result<()> {
-    let mut stdout = io::stdout().lock();
+pub fn run(command_string: String, receiver: Receiver<String>) -> io::Result<()> {
     let mut manager = LineManager::new(5000);
-
-    enable_raw_mode()?;
-    crossterm::execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut term = Terminal::new(backend)?;
+    let mut term = setup_terminal()?;
     let mut textarea = create_text_area();
-
     let layout =
         Layout::default().constraints([Constraint::Length(3), Constraint::Min(1)].as_slice());
-
     let mut filter = String::new();
 
     loop {
@@ -49,12 +33,7 @@ pub fn start_ui(command_string: String, receiver: Receiver<String>) -> io::Resul
             }
         }
 
-        let new_line_option: Option<String> = match receiver.try_recv() {
-            Ok(value) => Some(value),
-            _ => None,
-        };
-
-        if let Some(new_line) = new_line_option {
+        if let Some(new_line) = try_receive_new_line(&receiver) {
             manager.add_line(new_line)
         }
 
@@ -65,24 +44,28 @@ pub fn start_ui(command_string: String, receiver: Receiver<String>) -> io::Resul
             let widget = textarea.widget();
             f.render_widget(widget, chunks[0]);
 
-            let list_items = list_lines
-                .iter()
-                .cloned()
-                .map(ListItem::new)
-                .collect::<Vec<ListItem>>();
+            let lines_widget = render_lines_widget(list_lines, &command_string);
 
-            let list = List::new(list_items)
-                .block(
-                    Block::default()
-                        .title(command_string.clone())
-                        .borders(Borders::ALL),
-                )
-                .style(Style::default().fg(Color::White));
-
-            f.render_widget(list, chunks[1]);
+            f.render_widget(lines_widget, chunks[1]);
         })?;
     }
 
+    cleanup_terminal(term)?;
+
+    Ok(())
+}
+
+fn setup_terminal<'a>() -> io::Result<Terminal<CrosstermBackend<io::StdoutLock<'a>>>> {
+    let mut stdout = io::stdout().lock();
+    enable_raw_mode()?;
+    crossterm::execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
+    let term = Terminal::new(backend)?;
+
+    Ok(term)
+}
+
+fn cleanup_terminal(mut term: Terminal<CrosstermBackend<io::StdoutLock>>) -> io::Result<()> {
     disable_raw_mode()?;
     crossterm::execute!(
         term.backend_mut(),
@@ -92,4 +75,38 @@ pub fn start_ui(command_string: String, receiver: Receiver<String>) -> io::Resul
     term.show_cursor()?;
 
     Ok(())
+}
+
+fn create_text_area<'a>() -> TextArea<'a> {
+    let mut textarea = TextArea::default();
+    textarea.set_block(Block::default().borders(Borders::ALL).title("Search"));
+    textarea.set_style(Style::default().fg(Color::White));
+    textarea.set_cursor_line_style(Style::default());
+
+    textarea
+}
+
+fn try_receive_new_line(receiver: &Receiver<String>) -> Option<String> {
+    match receiver.try_recv() {
+        Ok(value) => Some(value),
+        _ => None,
+    }
+}
+
+fn render_lines_widget(list_lines: Vec<String>, command_string: &str) -> impl Widget {
+    let list_items = list_lines
+        .iter()
+        .cloned()
+        .map(ListItem::new)
+        .collect::<Vec<ListItem>>();
+
+    let list = List::new(list_items)
+        .block(
+            Block::default()
+                .title(command_string.to_owned())
+                .borders(Borders::ALL),
+        )
+        .style(Style::default().fg(Color::White));
+
+    list
 }
