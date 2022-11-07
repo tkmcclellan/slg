@@ -2,9 +2,10 @@ use crate::line_manager::LineManager;
 use std::io;
 use std::time::Duration;
 use tui::backend::CrosstermBackend;
-use tui::layout::{Constraint, Layout};
+use tui::layout::{Alignment, Constraint, Layout};
 use tui::style::{Color, Style};
-use tui::widgets::{Block, Borders, List, ListItem, Widget};
+use tui::text::{Span, Spans};
+use tui::widgets::{Block, Borders, Paragraph, Widget, Wrap};
 use tui::Frame;
 use tui_textarea::{Input, Key, TextArea};
 
@@ -14,6 +15,7 @@ pub struct App<'a> {
     layout: Layout,
     filter: String,
     command_string: &'a str,
+    scroll: u16,
 }
 
 impl<'a> App<'a> {
@@ -30,6 +32,7 @@ impl<'a> App<'a> {
             layout,
             filter,
             command_string,
+            scroll: 0,
         }
     }
 
@@ -37,6 +40,8 @@ impl<'a> App<'a> {
         if crossterm::event::poll(Duration::from_millis(50))? {
             match crossterm::event::read()?.into() {
                 Input { key: Key::Esc, .. } => return Ok(false),
+                Input { key: Key::Up, .. } => self.scroll_up(),
+                Input { key: Key::Down, .. } => self.scroll_down(),
                 input => {
                     if self.textarea.input(input) {
                         self.filter = self.textarea.lines()[0].clone();
@@ -46,6 +51,16 @@ impl<'a> App<'a> {
         }
 
         Ok(true)
+    }
+
+    fn scroll_up(&mut self) {
+        if self.scroll > 0 {
+            self.scroll -= 1;
+        }
+    }
+
+    fn scroll_down(&mut self) {
+        self.scroll += 1;
     }
 
     pub fn add_line(&mut self, new_line: String) {
@@ -68,21 +83,24 @@ impl<'a> App<'a> {
         list_lines: Vec<String>,
         command_string: &str,
     ) -> impl Widget {
-        let list_items = list_lines
+        let line_spans = list_lines
             .iter()
             .cloned()
-            .map(ListItem::new)
-            .collect::<Vec<ListItem>>();
+            .map(|x| Spans::from(Span::raw(x)))
+            .collect::<Vec<Spans>>();
 
-        let list = List::new(list_items)
+        let paragraph = Paragraph::new(line_spans)
             .block(
                 Block::default()
                     .title(command_string.to_owned())
                     .borders(Borders::ALL),
             )
-            .style(Style::default().fg(Color::White));
+            .style(Style::default())
+            .alignment(Alignment::Left)
+            .wrap(Wrap { trim: true })
+            .scroll((self.scroll, 0));
 
-        list
+        paragraph
     }
 }
 
