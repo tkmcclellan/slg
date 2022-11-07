@@ -10,9 +10,13 @@ use std::sync::mpsc::Receiver;
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
 
-pub fn run(command_string: String, receiver: Receiver<String>) -> io::Result<()> {
+pub fn run(
+    command_string: String,
+    receiver: Receiver<String>,
+    line_limit: usize,
+) -> io::Result<()> {
     let mut term = setup_terminal()?;
-    let mut app = App::new(5000, &command_string);
+    let mut app = App::new(line_limit, &command_string);
 
     loop {
         match app.poll_for_filter() {
