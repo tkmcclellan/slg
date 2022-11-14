@@ -40,7 +40,7 @@ impl<'a> App<'a> {
     }
 
     pub fn poll_for_filter(&mut self) -> io::Result<PollResult> {
-        if crossterm::event::poll(Duration::from_millis(50))? {
+        if crossterm::event::poll(Duration::ZERO)? {
             match crossterm::event::read()?.into() {
                 Input { key: Key::Esc, .. } => return Ok(PollResult::Escape),
                 Input { key: Key::Up, .. } => self.scroll_up(),
