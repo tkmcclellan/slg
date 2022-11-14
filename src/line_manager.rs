@@ -38,7 +38,7 @@ impl LineManager {
             .collect()
     }
 
-    pub fn count(& self) -> usize {
+    pub fn count(&self) -> usize {
         self.lines.len()
     }
 }

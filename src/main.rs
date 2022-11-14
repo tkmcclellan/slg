@@ -11,7 +11,10 @@ const DEFAULT_LINE_LIMIT: usize = 1_000_000;
 #[command(author, version, about, long_about = None)]
 struct CliArgs {
     /// Command to be run.
-    command: Vec<String>,
+    command: String,
+
+    /// Arguments for command.
+    args: Vec<String>,
 
     /// Number of lines to retain in memory. Defaults to 1M.
     #[arg(long)]
@@ -20,14 +23,22 @@ struct CliArgs {
 
 fn main() -> io::Result<()> {
     let cli = CliArgs::parse();
-    let (command, args, command_string) = command_runner::process_args(cli.command.iter().cloned());
+    let mut command_string = cli.command.clone();
+
+    for arg in cli.args.iter() {
+        command_string.push(' ');
+        command_string.push_str(arg);
+    }
+
     let line_limit = match cli.num_lines {
         Some(value) => value,
         None => DEFAULT_LINE_LIMIT,
     };
 
-    let receiver = command_runner::run(command, args);
-    ui::run(command_string, receiver, line_limit)?;
+    match command_runner::run(cli.command, cli.args) {
+        Ok(receiver) => ui::run(command_string, receiver, line_limit)?,
+        Err(error_string) => println!("{}", error_string),
+    }
 
     Ok(())
 }
