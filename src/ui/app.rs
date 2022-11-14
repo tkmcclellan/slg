@@ -1,9 +1,9 @@
 use crate::line_manager::LineManager;
 use std::io;
 use std::time::Duration;
-use tui::backend::CrosstermBackend;
+use tui::backend::Backend;
 use tui::layout::{Alignment, Constraint, Layout};
-use tui::style::{Color, Style};
+use tui::style::Style;
 use tui::text::{Span, Spans};
 use tui::widgets::{Block, Borders, Paragraph, Widget, Wrap};
 use tui::Frame;
@@ -13,9 +13,14 @@ pub struct App<'a> {
     textarea: TextArea<'a>,
     line_manager: LineManager,
     layout: Layout,
-    filter: String,
     command_string: &'a str,
     scroll: u16,
+}
+
+pub enum PollResult {
+    NewFilter,
+    NoNewFilter,
+    Escape,
 }
 
 impl<'a> App<'a> {
@@ -24,33 +29,34 @@ impl<'a> App<'a> {
         let textarea = create_text_area();
         let layout =
             Layout::default().constraints([Constraint::Length(3), Constraint::Min(1)].as_slice());
-        let filter = String::new();
 
         App {
             textarea,
             line_manager,
             layout,
-            filter,
             command_string,
             scroll: 0,
         }
     }
 
-    pub fn poll_for_filter(&mut self) -> io::Result<bool> {
+    pub fn poll_for_filter(&mut self) -> io::Result<PollResult> {
         if crossterm::event::poll(Duration::from_millis(50))? {
             match crossterm::event::read()?.into() {
-                Input { key: Key::Esc, .. } => return Ok(false),
+                Input { key: Key::Esc, .. } => return Ok(PollResult::Escape),
                 Input { key: Key::Up, .. } => self.scroll_up(),
                 Input { key: Key::Down, .. } => self.scroll_down(),
                 input => {
                     if self.textarea.input(input) {
-                        self.filter = self.textarea.lines()[0].clone();
+                        self.line_manager
+                            .update_filter(self.textarea.lines()[0].clone());
+
+                        return Ok(PollResult::NewFilter);
                     }
                 }
             }
         }
 
-        Ok(true)
+        Ok(PollResult::NoNewFilter)
     }
 
     fn scroll_up(&mut self) {
@@ -67,12 +73,12 @@ impl<'a> App<'a> {
         self.line_manager.add_line(new_line);
     }
 
-    pub fn draw_in_frame(&mut self, f: &mut Frame<CrosstermBackend<io::StdoutLock>>) {
+    pub fn draw_in_frame<B: Backend>(&mut self, f: &mut Frame<B>) {
         let chunks = self.layout.split(f.size());
         let widget = self.textarea.widget();
         f.render_widget(widget, chunks[0]);
 
-        let list_lines = self.line_manager.filter(self.filter.clone());
+        let list_lines = self.line_manager.filter();
         let lines_widget = self.render_lines_widget(list_lines, self.command_string);
 
         f.render_widget(lines_widget, chunks[1]);
@@ -107,8 +113,51 @@ impl<'a> App<'a> {
 fn create_text_area<'a>() -> TextArea<'a> {
     let mut textarea = TextArea::default();
     textarea.set_block(Block::default().borders(Borders::ALL).title("Search"));
-    textarea.set_style(Style::default().fg(Color::White));
+    textarea.set_style(Style::default());
     textarea.set_cursor_line_style(Style::default());
 
     textarea
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_app_scrolls_up() {
+        let mut app = App::new(1, "Test");
+
+        app.scroll_up();
+
+        assert_eq!(app.scroll, 0);
+    }
+
+    #[test]
+    fn scrolled_app_scrolls_up() {
+        let mut app = App::new(1, "Test");
+
+        app.scroll = 2;
+
+        app.scroll_up();
+
+        assert_eq!(app.scroll, 1);
+    }
+
+    #[test]
+    fn new_app_scrolls_down() {
+        let mut app = App::new(1, "Test");
+
+        app.scroll_down();
+
+        assert_eq!(app.scroll, 1);
+    }
+
+    #[test]
+    fn adds_line() {
+        let mut app = App::new(1, "Test");
+
+        app.add_line("This is a line!".to_string());
+
+        assert_eq!(app.line_manager.lines, vec!["This is a line!".to_string()]);
+    }
 }

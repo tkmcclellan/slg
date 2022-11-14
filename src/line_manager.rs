@@ -2,7 +2,8 @@ use regex::Regex;
 
 pub struct LineManager {
     size: usize,
-    lines: Vec<String>,
+    pub lines: Vec<String>,
+    filter: Regex,
 }
 
 impl LineManager {
@@ -10,6 +11,7 @@ impl LineManager {
         LineManager {
             lines: Vec::new(),
             size,
+            filter: Regex::new("").unwrap(),
         }
     }
 
@@ -21,13 +23,18 @@ impl LineManager {
         self.lines.push(new_line);
     }
 
-    pub fn filter(&mut self, filter: String) -> Vec<String> {
-        let re = Regex::new(&filter).unwrap();
+    pub fn update_filter(&mut self, filter: String) {
+        if let Ok(filter_regex) = Regex::new(&filter) {
+            self.filter = filter_regex;
+        }
+    }
 
+    pub fn filter(&mut self) -> Vec<String> {
         self.lines
             .iter()
             .cloned()
-            .filter(move |x| re.is_match(x))
+            .rev()
+            .filter(|x| self.filter.is_match(x))
             .collect()
     }
 }
@@ -74,8 +81,8 @@ mod tests {
         manager.add_line(String::from("New line 2!"));
         manager.add_line(String::from("The line 3!"));
 
-        let filter = String::from("New");
+        manager.update_filter(String::from("New"));
 
-        assert_eq!(manager.filter(filter), vec!["New line!", "New line 2!"]);
+        assert_eq!(manager.filter(), vec!["New line 2!", "New line!"]);
     }
 }

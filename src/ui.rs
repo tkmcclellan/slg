@@ -1,6 +1,6 @@
 mod app;
 
-use app::App;
+use app::{App, PollResult};
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -19,16 +19,22 @@ pub fn run(
     let mut app = App::new(line_limit, &command_string);
 
     loop {
+        let mut should_render = false;
+
         match app.poll_for_filter() {
-            Ok(true) => {}
+            Ok(PollResult::NewFilter) => should_render = true,
+            Ok(PollResult::NoNewFilter) => {}
             _ => break,
         }
 
         if let Some(new_line) = try_receive_new_line(&receiver) {
-            app.add_line(new_line)
+            app.add_line(new_line);
+            should_render = true;
         }
 
-        term.draw(|f| app.draw_in_frame(f))?;
+        if should_render {
+            term.draw(|f| app.draw_in_frame(f))?;
+        }
     }
 
     cleanup_terminal(term)?;
