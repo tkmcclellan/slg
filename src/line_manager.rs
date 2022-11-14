@@ -6,7 +6,10 @@ pub struct LineManager {
     filter: Regex,
 }
 
+const BUFFER_LINES_IN_APP: usize = 4;
+
 impl LineManager {
+
     pub fn new(size: usize) -> LineManager {
         LineManager {
             lines: Vec::new(),
@@ -29,12 +32,18 @@ impl LineManager {
         }
     }
 
-    pub fn filter(&mut self) -> Vec<String> {
+    pub fn filter(&mut self, height: usize) -> Vec<String> {
+        let lines_on_screen = match height {
+            0..=BUFFER_LINES_IN_APP => 0,
+            _ => height - BUFFER_LINES_IN_APP
+        };
+
         self.lines
             .iter()
             .cloned()
             .rev()
             .filter(|x| self.filter.is_match(x))
+            .take(lines_on_screen)
             .collect()
     }
 
@@ -87,7 +96,7 @@ mod tests {
 
         manager.update_filter(String::from("New"));
 
-        assert_eq!(manager.filter(), vec!["New line 2!", "New line!"]);
+        assert_eq!(manager.filter(10), vec!["New line 2!", "New line!"]);
     }
 
     #[test]

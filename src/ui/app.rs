@@ -78,7 +78,7 @@ impl<'a> App<'a> {
         let widget = self.textarea.widget();
         f.render_widget(widget, chunks[0]);
 
-        let list_lines = self.line_manager.filter();
+        let list_lines = self.line_manager.filter(f.size().height as usize);
         let lines_widget = self.render_lines_widget(list_lines, self.command_string);
 
         f.render_widget(lines_widget, chunks[1]);
