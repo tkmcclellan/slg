@@ -37,6 +37,10 @@ impl LineManager {
             .filter(|x| self.filter.is_match(x))
             .collect()
     }
+
+    pub fn count(& self) -> usize {
+        self.lines.len()
+    }
 }
 
 #[cfg(test)]
@@ -84,5 +88,15 @@ mod tests {
         manager.update_filter(String::from("New"));
 
         assert_eq!(manager.filter(), vec!["New line 2!", "New line!"]);
+    }
+
+    #[test]
+    fn gets_count() {
+        let mut manager = LineManager::new(5);
+        manager.add_line(String::from("New line!"));
+        manager.add_line(String::from("New line 2!"));
+        manager.add_line(String::from("The line 3!"));
+
+        assert_eq!(manager.count(), 3);
     }
 }

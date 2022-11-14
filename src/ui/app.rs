@@ -98,7 +98,7 @@ impl<'a> App<'a> {
         let paragraph = Paragraph::new(line_spans)
             .block(
                 Block::default()
-                    .title(command_string.to_owned())
+                    .title(format!("{} - {}", command_string.to_owned(), self.line_manager.count()))
                     .borders(Borders::ALL),
             )
             .style(Style::default())
