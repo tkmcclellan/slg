@@ -89,7 +89,7 @@ impl<'a> App<'a> {
         list_lines: Vec<String>,
         command_string: &str,
     ) -> impl Widget + '_ {
-        let highlighted_style = Style::default().bg(Color::Yellow);
+        let highlighted_style = Style::default().fg(Color::Black).bg(Color::Yellow);
 
         let line_spans = list_lines
             .iter()
