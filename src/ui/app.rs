@@ -3,7 +3,7 @@ use std::io;
 use std::time::Duration;
 use tui::backend::Backend;
 use tui::layout::{Alignment, Constraint, Layout};
-use tui::style::Style;
+use tui::style::{Color, Style};
 use tui::text::{Span, Spans};
 use tui::widgets::{Block, Borders, Paragraph, Widget, Wrap};
 use tui::Frame;
@@ -88,11 +88,64 @@ impl<'a> App<'a> {
         &mut self,
         list_lines: Vec<String>,
         command_string: &str,
-    ) -> impl Widget {
+    ) -> impl Widget + '_ {
+        let highlighted_style = Style::default().bg(Color::Yellow);
+
         let line_spans = list_lines
             .iter()
             .cloned()
-            .map(|x| Spans::from(Span::raw(x)))
+            .map(|line| {
+                if !self.line_manager.filter.as_str().is_empty() {
+                    let mut spans = Vec::new();
+
+                    let mut last_index = 0;
+
+                    for rmatch in self.line_manager.filter.find_iter(&line) {
+                        let match_range = (rmatch.start(), rmatch.end());
+
+                        match match_range {
+                            // front of string
+                            (0, back) => {
+                                spans.push(Span::styled(
+                                    rmatch.as_str().to_string(),
+                                    highlighted_style,
+                                ));
+                                last_index = back;
+                            }
+                            // back of string
+                            (_, back) if back == line.len() - 1 => {
+                                spans.push(Span::styled(
+                                    rmatch.as_str().to_string(),
+                                    highlighted_style,
+                                ));
+                            }
+                            // middle of string
+                            (front, back) => {
+                                let before_match = &line[last_index..front];
+
+                                if !before_match.is_empty() {
+                                    spans.push(Span::from(before_match.to_string()));
+                                }
+
+                                spans.push(Span::styled(
+                                    rmatch.as_str().to_string(),
+                                    highlighted_style,
+                                ));
+
+                                last_index = back;
+                            }
+                        }
+                    }
+
+                    if last_index != line.len() - 1 {
+                        spans.push(Span::from(line[last_index..line.len()].to_string()));
+                    }
+
+                    Spans::from(spans)
+                } else {
+                    Spans::from(Span::raw(line))
+                }
+            })
             .collect::<Vec<Spans>>();
 
         let paragraph = Paragraph::new(line_spans)

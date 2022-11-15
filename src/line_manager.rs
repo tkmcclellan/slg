@@ -3,13 +3,12 @@ use regex::Regex;
 pub struct LineManager {
     size: usize,
     pub lines: Vec<String>,
-    filter: Regex,
+    pub filter: Regex,
 }
 
 const BUFFER_LINES_IN_APP: usize = 4;
 
 impl LineManager {
-
     pub fn new(size: usize) -> LineManager {
         LineManager {
             lines: Vec::new(),
@@ -35,7 +34,7 @@ impl LineManager {
     pub fn filter(&mut self, height: usize) -> Vec<String> {
         let lines_on_screen = match height {
             0..=BUFFER_LINES_IN_APP => 0,
-            _ => height - BUFFER_LINES_IN_APP
+            _ => height - BUFFER_LINES_IN_APP,
         };
 
         self.lines
