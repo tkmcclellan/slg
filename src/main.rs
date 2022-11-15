@@ -23,12 +23,7 @@ struct CliArgs {
 
 fn main() -> io::Result<()> {
     let cli = CliArgs::parse();
-    let mut command_string = cli.command.clone();
-
-    for arg in cli.args.iter() {
-        command_string.push(' ');
-        command_string.push_str(arg);
-    }
+    let command_string = cli.command.clone() + " " + &cli.args.join(" ");
 
     let line_limit = match cli.num_lines {
         Some(value) => value,
