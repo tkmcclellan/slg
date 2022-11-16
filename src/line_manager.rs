@@ -37,13 +37,21 @@ impl LineManager {
             _ => height - BUFFER_LINES_IN_APP,
         };
 
-        self.lines
+        // NOTE: this is probably a stupid way of taking the last n elements of a vec
+        // in order, but since `lines_on_screen` will always be a relatively low number
+        // this should hopefully not be too inefficient. If you know a better way of doing
+        // this, please PR.
+        let mut reversed_vec: Vec<String> = self.lines
             .iter()
             .cloned()
             .rev()
             .filter(|x| self.filter.is_match(x))
             .take(lines_on_screen)
-            .collect()
+            .collect();
+
+        reversed_vec.reverse();
+
+        reversed_vec
     }
 
     pub fn count(&self) -> usize {
@@ -95,7 +103,7 @@ mod tests {
 
         manager.update_filter(String::from("New"));
 
-        assert_eq!(manager.filter(10), vec!["New line 2!", "New line!"]);
+        assert_eq!(manager.filter(10), vec!["New line!", "New line 2!"]);
     }
 
     #[test]
