@@ -6,8 +6,6 @@ pub struct LineManager {
     pub filter: Regex,
 }
 
-const BUFFER_LINES_IN_APP: usize = 4;
-
 impl LineManager {
     pub fn new(size: usize) -> LineManager {
         LineManager {
@@ -31,27 +29,13 @@ impl LineManager {
         }
     }
 
-    pub fn filter(&mut self, height: usize) -> Vec<String> {
-        let lines_on_screen = match height {
-            0..=BUFFER_LINES_IN_APP => 0,
-            _ => height - BUFFER_LINES_IN_APP,
-        };
-
-        // NOTE: this is probably a stupid way of taking the last n elements of a vec
-        // in order, but since `lines_on_screen` will always be a relatively low number
-        // this should hopefully not be too inefficient. If you know a better way of doing
-        // this, please PR.
-        let mut reversed_vec: Vec<String> = self.lines
+    pub fn filter(&mut self) -> Vec<String> {
+        self.lines
             .iter()
             .cloned()
             .rev()
             .filter(|x| self.filter.is_match(x))
-            .take(lines_on_screen)
-            .collect();
-
-        reversed_vec.reverse();
-
-        reversed_vec
+            .collect()
     }
 
     pub fn count(&self) -> usize {
@@ -103,7 +87,7 @@ mod tests {
 
         manager.update_filter(String::from("New"));
 
-        assert_eq!(manager.filter(10), vec!["New line!", "New line 2!"]);
+        assert_eq!(manager.filter(), vec!["New line 2!", "New line!"]);
     }
 
     #[test]

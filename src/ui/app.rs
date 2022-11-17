@@ -28,7 +28,7 @@ impl<'a> App<'a> {
         let line_manager = LineManager::new(line_capacity);
         let textarea = create_text_area();
         let layout =
-            Layout::default().constraints([Constraint::Min(1), Constraint::Length(3)].as_slice());
+            Layout::default().constraints([Constraint::Length(3), Constraint::Min(1)].as_slice());
 
         App {
             textarea,
@@ -76,12 +76,12 @@ impl<'a> App<'a> {
     pub fn draw_in_frame<B: Backend>(&mut self, f: &mut Frame<B>) {
         let chunks = self.layout.split(f.size());
         let widget = self.textarea.widget();
-        f.render_widget(widget, chunks[1]);
+        f.render_widget(widget, chunks[0]);
 
-        let list_lines = self.line_manager.filter(f.size().height as usize);
+        let list_lines = self.line_manager.filter();
         let lines_widget = self.render_lines_widget(list_lines, self.command_string);
 
-        f.render_widget(lines_widget, chunks[0]);
+        f.render_widget(lines_widget, chunks[1]);
     }
 
     fn render_lines_widget(
