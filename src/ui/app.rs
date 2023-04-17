@@ -1,4 +1,6 @@
 use crate::line_manager::LineManager;
+use cansi::v3::categorise_text;
+use rayon::prelude::*;
 use std::io;
 use std::time::Duration;
 use tui::backend::Backend;
@@ -79,74 +81,22 @@ impl<'a> App<'a> {
         f.render_widget(widget, chunks[0]);
 
         let list_lines = self.line_manager.filter();
-        let lines_widget = self.render_lines_widget(list_lines, self.command_string);
+        let lines_widget = self.render_lines_widget(&list_lines, self.command_string);
 
         f.render_widget(lines_widget, chunks[1]);
     }
 
-    fn render_lines_widget(
-        &mut self,
-        list_lines: Vec<String>,
+    fn render_lines_widget<'b>(
+        &'b mut self,
+        list_lines: &'b Vec<String>,
         command_string: &str,
-    ) -> impl Widget + '_ {
-        let highlighted_style = Style::default().fg(Color::Black).bg(Color::Yellow);
+    ) -> impl Widget + 'b {
+        let mut line_spans = Vec::<Spans>::new();
 
-        let line_spans = list_lines
-            .iter()
-            .cloned()
-            .map(|line| {
-                if !self.line_manager.filter.as_str().is_empty() {
-                    let mut spans = Vec::new();
-
-                    let mut last_index = 0;
-
-                    for rmatch in self.line_manager.filter.find_iter(&line) {
-                        let match_range = (rmatch.start(), rmatch.end());
-
-                        match match_range {
-                            // front of string
-                            (0, back) => {
-                                spans.push(Span::styled(
-                                    rmatch.as_str().to_string(),
-                                    highlighted_style,
-                                ));
-                                last_index = back;
-                            }
-                            // back of string
-                            (_, back) if back == line.len() - 1 => {
-                                spans.push(Span::styled(
-                                    rmatch.as_str().to_string(),
-                                    highlighted_style,
-                                ));
-                            }
-                            // middle of string
-                            (front, back) => {
-                                let before_match = &line[last_index..front];
-
-                                if !before_match.is_empty() {
-                                    spans.push(Span::from(before_match.to_string()));
-                                }
-
-                                spans.push(Span::styled(
-                                    rmatch.as_str().to_string(),
-                                    highlighted_style,
-                                ));
-
-                                last_index = back;
-                            }
-                        }
-                    }
-
-                    if last_index != line.len() - 1 {
-                        spans.push(Span::from(line[last_index..line.len()].to_string()));
-                    }
-
-                    Spans::from(spans)
-                } else {
-                    Spans::from(Span::raw(line))
-                }
-            })
-            .collect::<Vec<Spans>>();
+        list_lines
+            .par_iter()
+            .map(|line| Spans::from(self.color_line(line)))
+            .collect_into_vec(&mut line_spans);
 
         let paragraph = Paragraph::new(line_spans)
             .block(
@@ -165,6 +115,71 @@ impl<'a> App<'a> {
 
         paragraph
     }
+
+    fn color_line<'b>(&self, line: &'b str) -> Vec<Span<'b>> {
+        categorise_text(&line)
+            .iter()
+            .map(|result| {
+                let mut style = Style::default();
+
+                if let Some(fg) = result.fg {
+                    style = style.fg(cansi_color_to_tui_color(fg))
+                }
+
+                if let Some(bg) = result.bg {
+                    style = style.bg(cansi_color_to_tui_color(bg))
+                }
+
+                Span::styled(result.text, style)
+            })
+            .collect::<Vec<Span>>()
+    }
+
+    fn highlight_line(&self, line: String) -> Spans {
+        let highlighted_style = Style::default().fg(Color::Black).bg(Color::Yellow);
+
+        if self.line_manager.has_filter() {
+            let mut spans = Vec::new();
+
+            let mut last_index = 0;
+
+            for rmatch in self.line_manager.filter.find_iter(&line) {
+                let match_range = (rmatch.start(), rmatch.end());
+
+                match match_range {
+                    // front of string
+                    (0, back) => {
+                        spans.push(Span::styled(rmatch.as_str().to_string(), highlighted_style));
+                        last_index = back;
+                    }
+                    // back of string
+                    (_, back) if back == line.len() - 1 => {
+                        spans.push(Span::styled(rmatch.as_str().to_string(), highlighted_style));
+                    }
+                    // middle of string
+                    (front, back) => {
+                        let before_match = &line[last_index..front];
+
+                        if !before_match.is_empty() {
+                            spans.push(Span::from(before_match.to_string()));
+                        }
+
+                        spans.push(Span::styled(rmatch.as_str().to_string(), highlighted_style));
+
+                        last_index = back;
+                    }
+                }
+            }
+
+            if last_index != line.len() - 1 {
+                spans.push(Span::from(line[last_index..line.len()].to_string()));
+            }
+
+            Spans::from(spans)
+        } else {
+            Spans::from(Span::raw(line))
+        }
+    }
 }
 
 fn create_text_area<'a>() -> TextArea<'a> {
@@ -174,6 +189,27 @@ fn create_text_area<'a>() -> TextArea<'a> {
     textarea.set_cursor_line_style(Style::default());
 
     textarea
+}
+
+fn cansi_color_to_tui_color(cansi_color: cansi::v3::Color) -> tui::style::Color {
+    match cansi_color {
+        cansi::v3::Color::Black => tui::style::Color::Black,
+        cansi::v3::Color::Red => tui::style::Color::Red,
+        cansi::v3::Color::Green => tui::style::Color::Green,
+        cansi::v3::Color::Yellow => tui::style::Color::Yellow,
+        cansi::v3::Color::Blue => tui::style::Color::Blue,
+        cansi::v3::Color::Magenta => tui::style::Color::Magenta,
+        cansi::v3::Color::Cyan => tui::style::Color::Cyan,
+        cansi::v3::Color::White => tui::style::Color::White,
+        cansi::v3::Color::BrightBlack => tui::style::Color::Gray,
+        cansi::v3::Color::BrightRed => tui::style::Color::LightRed,
+        cansi::v3::Color::BrightGreen => tui::style::Color::LightGreen,
+        cansi::v3::Color::BrightYellow => tui::style::Color::LightYellow,
+        cansi::v3::Color::BrightBlue => tui::style::Color::LightBlue,
+        cansi::v3::Color::BrightMagenta => tui::style::Color::LightMagenta,
+        cansi::v3::Color::BrightCyan => tui::style::Color::LightCyan,
+        cansi::v3::Color::BrightWhite => tui::style::Color::White,
+    }
 }
 
 #[cfg(test)]

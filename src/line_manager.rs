@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use regex::Regex;
 
 pub struct LineManager {
@@ -31,7 +32,7 @@ impl LineManager {
 
     pub fn filter(&mut self) -> Vec<String> {
         self.lines
-            .iter()
+            .par_iter()
             .cloned()
             .rev()
             .filter(|x| self.filter.is_match(x))
@@ -40,6 +41,10 @@ impl LineManager {
 
     pub fn count(&self) -> usize {
         self.lines.len()
+    }
+
+    pub fn has_filter(&self) -> bool {
+        !self.filter.as_str().is_empty()
     }
 }
 
