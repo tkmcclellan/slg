@@ -6,35 +6,29 @@ use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use std::io;
-use std::sync::mpsc::Receiver;
+use std::sync::{Arc, Mutex};
+use std::{thread, time};
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
 
-pub fn run(
-    command_string: String,
-    receiver: Receiver<String>,
-    line_limit: usize,
-) -> io::Result<()> {
+use crate::line_manager::LineManager;
+
+pub fn run(command_string: String, line_manager: Arc<Mutex<LineManager>>) -> io::Result<()> {
     let mut term = setup_terminal()?;
-    let mut app = App::new(line_limit, &command_string);
+    let mut app = App::new(line_manager, &command_string);
 
     loop {
-        let mut should_render = false;
-
         match app.poll_for_filter() {
-            Ok(PollResult::NewFilter) => should_render = true,
+            Ok(PollResult::NewFilter) => {}
             Ok(PollResult::NoNewFilter) => {}
+            Ok(PollResult::Escape) => break,
             _ => break,
         }
 
-        if let Some(new_line) = try_receive_new_line(&receiver) {
-            app.add_line(new_line);
-            should_render = true;
-        }
+        let sleep_duration = time::Duration::from_millis(5);
+        thread::sleep(sleep_duration);
 
-        if should_render {
-            term.draw(|f| app.draw_in_frame(f))?;
-        }
+        term.draw(|f| app.draw_in_frame(f))?;
     }
 
     cleanup_terminal(term)?;
@@ -62,11 +56,4 @@ fn cleanup_terminal(mut term: Terminal<CrosstermBackend<io::StdoutLock>>) -> io:
     term.show_cursor()?;
 
     Ok(())
-}
-
-fn try_receive_new_line(receiver: &Receiver<String>) -> Option<String> {
-    match receiver.try_recv() {
-        Ok(value) => Some(value),
-        _ => None,
-    }
 }

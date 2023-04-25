@@ -1,11 +1,15 @@
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
-use std::sync::mpsc::{channel, Receiver};
+use std::sync::{Arc, Mutex};
 use std::thread;
 
-pub fn run(command: String, args: Vec<String>) -> Result<Receiver<String>, String> {
-    let (send, recv) = channel();
+use crate::line_manager::LineManager;
 
+pub fn run(
+    command: String,
+    args: Vec<String>,
+    line_manager: Arc<Mutex<LineManager>>,
+) -> Result<(), String> {
     match spawn_process(&command, &args) {
         Ok(mut process) => {
             thread::spawn(move || loop {
@@ -13,12 +17,12 @@ pub fn run(command: String, args: Vec<String>) -> Result<Receiver<String>, Strin
                     let buf_reader = BufReader::new(out);
 
                     for line in buf_reader.lines().flatten() {
-                        send.send(line).unwrap_or(());
+                        line_manager.lock().unwrap().add_line(line);
                     }
                 }
             });
 
-            Ok(recv)
+            Ok(())
         }
         Err(error) => Err(format!(
             "Failed to start command \"{} {:?}\": {}",

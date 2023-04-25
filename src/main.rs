@@ -3,7 +3,9 @@ mod line_manager;
 mod ui;
 
 use clap::Parser;
+use line_manager::LineManager;
 use std::io;
+use std::sync::{Arc, Mutex};
 
 const DEFAULT_LINE_LIMIT: usize = 1_000_000;
 
@@ -30,8 +32,10 @@ fn main() -> io::Result<()> {
         None => DEFAULT_LINE_LIMIT,
     };
 
-    match command_runner::run(cli.command, cli.args) {
-        Ok(receiver) => ui::run(command_string, receiver, line_limit)?,
+    let line_manager = Arc::new(Mutex::new(LineManager::new(line_limit)));
+
+    match command_runner::run(cli.command, cli.args, line_manager.clone()) {
+        Ok(_) => ui::run(command_string, line_manager)?,
         Err(error_string) => println!("{}", error_string),
     }
 

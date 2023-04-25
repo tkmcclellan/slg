@@ -1,7 +1,10 @@
 use crate::line_manager::LineManager;
 use cansi::v3::categorise_text;
 use rayon::prelude::*;
+use regex::Regex;
+use std::cmp::max;
 use std::io;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tui::backend::Backend;
 use tui::layout::{Alignment, Constraint, Layout};
@@ -13,7 +16,8 @@ use tui_textarea::{Input, Key, TextArea};
 
 pub struct App<'a> {
     textarea: TextArea<'a>,
-    line_manager: LineManager,
+    line_manager: Arc<Mutex<LineManager>>,
+    filter: Regex,
     layout: Layout,
     command_string: &'a str,
     scroll: u16,
@@ -26,18 +30,25 @@ pub enum PollResult {
 }
 
 impl<'a> App<'a> {
-    pub fn new(line_capacity: usize, command_string: &'a str) -> App<'a> {
-        let line_manager = LineManager::new(line_capacity);
+    pub fn new(line_manager: Arc<Mutex<LineManager>>, command_string: &'a str) -> App<'a> {
         let textarea = create_text_area();
         let layout =
             Layout::default().constraints([Constraint::Length(3), Constraint::Min(1)].as_slice());
+        let filter = Regex::new("").unwrap();
 
         App {
             textarea,
             line_manager,
             layout,
             command_string,
+            filter,
             scroll: 0,
+        }
+    }
+
+    pub fn update_filter(&mut self, filter: String) {
+        if let Ok(filter_regex) = Regex::new(&filter) {
+            self.filter = filter_regex;
         }
     }
 
@@ -49,8 +60,7 @@ impl<'a> App<'a> {
                 Input { key: Key::Down, .. } => self.scroll_down(),
                 input => {
                     if self.textarea.input(input) {
-                        self.line_manager
-                            .update_filter(self.textarea.lines()[0].clone());
+                        self.update_filter(self.textarea.lines()[0].clone());
 
                         return Ok(PollResult::NewFilter);
                     }
@@ -71,25 +81,26 @@ impl<'a> App<'a> {
         self.scroll += 1;
     }
 
-    pub fn add_line(&mut self, new_line: String) {
-        self.line_manager.add_line(new_line);
-    }
-
     pub fn draw_in_frame<B: Backend>(&mut self, f: &mut Frame<B>) {
         let chunks = self.layout.split(f.size());
         let widget = self.textarea.widget();
+        let num_lines = max(0, chunks[1].height - 2);
         f.render_widget(widget, chunks[0]);
 
-        let list_lines = self.line_manager.filter();
-        let lines_widget = self.render_lines_widget(&list_lines, self.command_string);
+        let line_manager = self.line_manager.lock().unwrap();
+
+        let list_lines = line_manager.filter(&self.filter, num_lines as usize);
+        let num_lines = line_manager.count();
+        let lines_widget = self.render_lines_widget(&list_lines, self.command_string, num_lines);
 
         f.render_widget(lines_widget, chunks[1]);
     }
 
     fn render_lines_widget<'b>(
-        &'b mut self,
+        &'b self,
         list_lines: &'b Vec<String>,
         command_string: &str,
+        num_lines: usize,
     ) -> impl Widget + 'b {
         let mut line_spans = Vec::<Spans>::new();
 
@@ -101,11 +112,7 @@ impl<'a> App<'a> {
         let paragraph = Paragraph::new(line_spans)
             .block(
                 Block::default()
-                    .title(format!(
-                        "{} - {}",
-                        command_string.to_owned(),
-                        self.line_manager.count()
-                    ))
+                    .title(format!("{} - {}", command_string.to_owned(), num_lines,))
                     .borders(Borders::ALL),
             )
             .style(Style::default())
@@ -138,12 +145,12 @@ impl<'a> App<'a> {
     fn highlight_line(&self, line: String) -> Spans {
         let highlighted_style = Style::default().fg(Color::Black).bg(Color::Yellow);
 
-        if self.line_manager.has_filter() {
+        if !self.filter.as_str().is_empty() {
             let mut spans = Vec::new();
 
             let mut last_index = 0;
 
-            for rmatch in self.line_manager.filter.find_iter(&line) {
+            for rmatch in self.filter.find_iter(&line) {
                 let match_range = (rmatch.start(), rmatch.end());
 
                 match match_range {
@@ -216,9 +223,13 @@ fn cansi_color_to_tui_color(cansi_color: cansi::v3::Color) -> tui::style::Color 
 mod tests {
     use super::*;
 
+    fn manager(limit: usize) -> Arc<Mutex<LineManager>> {
+        Arc::new(Mutex::new(LineManager::new(limit)))
+    }
+
     #[test]
     fn new_app_scrolls_up() {
-        let mut app = App::new(1, "Test");
+        let mut app = App::new(manager(1), "Test");
 
         app.scroll_up();
 
@@ -227,7 +238,7 @@ mod tests {
 
     #[test]
     fn scrolled_app_scrolls_up() {
-        let mut app = App::new(1, "Test");
+        let mut app = App::new(manager(1), "Test");
 
         app.scroll = 2;
 
@@ -238,19 +249,10 @@ mod tests {
 
     #[test]
     fn new_app_scrolls_down() {
-        let mut app = App::new(1, "Test");
+        let mut app = App::new(manager(1), "Test");
 
         app.scroll_down();
 
         assert_eq!(app.scroll, 1);
-    }
-
-    #[test]
-    fn adds_line() {
-        let mut app = App::new(1, "Test");
-
-        app.add_line("This is a line!".to_string());
-
-        assert_eq!(app.line_manager.lines, vec!["This is a line!".to_string()]);
     }
 }

@@ -1,10 +1,8 @@
-use rayon::prelude::*;
 use regex::Regex;
 
 pub struct LineManager {
     size: usize,
     pub lines: Vec<String>,
-    pub filter: Regex,
 }
 
 impl LineManager {
@@ -12,7 +10,6 @@ impl LineManager {
         LineManager {
             lines: Vec::new(),
             size,
-            filter: Regex::new("").unwrap(),
         }
     }
 
@@ -24,27 +21,18 @@ impl LineManager {
         self.lines.push(new_line);
     }
 
-    pub fn update_filter(&mut self, filter: String) {
-        if let Ok(filter_regex) = Regex::new(&filter) {
-            self.filter = filter_regex;
-        }
-    }
-
-    pub fn filter(&mut self) -> Vec<String> {
+    pub fn filter(&self, filter: &Regex, items: usize) -> Vec<String> {
         self.lines
-            .par_iter()
+            .iter()
             .cloned()
             .rev()
-            .filter(|x| self.filter.is_match(x))
+            .filter(|x| filter.is_match(x))
+            .take(items)
             .collect()
     }
 
     pub fn count(&self) -> usize {
         self.lines.len()
-    }
-
-    pub fn has_filter(&self) -> bool {
-        !self.filter.as_str().is_empty()
     }
 }
 
@@ -90,9 +78,9 @@ mod tests {
         manager.add_line(String::from("New line 2!"));
         manager.add_line(String::from("The line 3!"));
 
-        manager.update_filter(String::from("New"));
+        let filter = Regex::new("New").unwrap();
 
-        assert_eq!(manager.filter(), vec!["New line 2!", "New line!"]);
+        assert_eq!(manager.filter(&filter, 3), vec!["New line 2!", "New line!"]);
     }
 
     #[test]
