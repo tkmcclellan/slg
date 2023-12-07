@@ -52,7 +52,7 @@ impl LineManager {
     }
 
     pub fn filter(&self, filter: &Regex, items: usize) -> Vec<String> {
-        self.lines[..(self.lines.len() - self.scroll - 1)]
+        self.lines[..self.scroll_distance()]
             .iter()
             .cloned()
             .rev()
@@ -63,6 +63,14 @@ impl LineManager {
 
     pub fn count(&self) -> usize {
         self.lines.len()
+    }
+
+    fn scroll_distance(&self) -> usize {
+        if self.lines.is_empty() {
+            0
+        } else {
+            self.lines.len() - self.scroll - 1
+        }
     }
 }
 

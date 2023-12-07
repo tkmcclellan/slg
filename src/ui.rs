@@ -1,7 +1,7 @@
 mod app;
 
 use app::{App, PollResult};
-use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
+use crossterm::event::DisableMouseCapture;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
@@ -39,7 +39,7 @@ pub fn run(command_string: String, line_manager: Arc<Mutex<LineManager>>) -> io:
 fn setup_terminal<'a>() -> io::Result<Terminal<CrosstermBackend<io::StdoutLock<'a>>>> {
     let mut stdout = io::stdout().lock();
     enable_raw_mode()?;
-    crossterm::execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    crossterm::execute!(stdout, EnterAlternateScreen, DisableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let term = Terminal::new(backend)?;
 
