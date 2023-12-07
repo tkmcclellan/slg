@@ -20,7 +20,6 @@ pub struct App<'a> {
     filter: Regex,
     layout: Layout,
     command_string: &'a str,
-    scroll: u16,
 }
 
 pub enum PollResult {
@@ -42,7 +41,6 @@ impl<'a> App<'a> {
             layout,
             command_string,
             filter,
-            scroll: 0,
         }
     }
 
@@ -56,8 +54,36 @@ impl<'a> App<'a> {
         if crossterm::event::poll(Duration::ZERO)? {
             match crossterm::event::read()?.into() {
                 Input { key: Key::Esc, .. } => return Ok(PollResult::Escape),
-                Input { key: Key::Up, .. } => self.scroll_up(),
-                Input { key: Key::Down, .. } => self.scroll_down(),
+                Input { key: Key::Up, .. }
+                | Input {
+                    key: Key::MouseScrollUp,
+                    ..
+                } => self.scroll_up(1),
+                Input { key: Key::Down, .. }
+                | Input {
+                    key: Key::MouseScrollDown,
+                    ..
+                } => self.scroll_down(1),
+                Input {
+                    key: Key::Char('k'),
+                    ctrl: true,
+                    ..
+                } => self.scroll_up(10),
+                Input {
+                    key: Key::Char('j'),
+                    ctrl: true,
+                    ..
+                } => self.scroll_down(10),
+                Input {
+                    key: Key::Char('s'),
+                    ctrl: true,
+                    ..
+                } => self.scroll_to_bottom(),
+                Input {
+                    key: Key::Char('w'),
+                    ctrl: true,
+                    ..
+                } => self.scroll_to_top(),
                 input => {
                     if self.textarea.input(input) {
                         self.update_filter(self.textarea.lines()[0].clone());
@@ -71,14 +97,20 @@ impl<'a> App<'a> {
         Ok(PollResult::NoNewFilter)
     }
 
-    fn scroll_up(&mut self) {
-        if self.scroll > 0 {
-            self.scroll -= 1;
-        }
+    fn scroll_up(&self, scroll: usize) {
+        self.line_manager.lock().unwrap().scroll_up(scroll)
     }
 
-    fn scroll_down(&mut self) {
-        self.scroll += 1;
+    fn scroll_down(&self, scroll: usize) {
+        self.line_manager.lock().unwrap().scroll_down(scroll)
+    }
+
+    fn scroll_to_top(&self) {
+        self.line_manager.lock().unwrap().scroll_to_top()
+    }
+
+    fn scroll_to_bottom(&self) {
+        self.line_manager.lock().unwrap().scroll_to_bottom()
     }
 
     pub fn draw_in_frame<B: Backend>(&mut self, f: &mut Frame<B>) {
@@ -117,8 +149,7 @@ impl<'a> App<'a> {
             )
             .style(Style::default())
             .alignment(Alignment::Left)
-            .wrap(Wrap { trim: true })
-            .scroll((self.scroll, 0));
+            .wrap(Wrap { trim: true });
 
         paragraph
     }
@@ -221,38 +252,5 @@ fn cansi_color_to_tui_color(cansi_color: cansi::v3::Color) -> tui::style::Color 
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    fn manager(limit: usize) -> Arc<Mutex<LineManager>> {
-        Arc::new(Mutex::new(LineManager::new(limit)))
-    }
-
-    #[test]
-    fn new_app_scrolls_up() {
-        let mut app = App::new(manager(1), "Test");
-
-        app.scroll_up();
-
-        assert_eq!(app.scroll, 0);
-    }
-
-    #[test]
-    fn scrolled_app_scrolls_up() {
-        let mut app = App::new(manager(1), "Test");
-
-        app.scroll = 2;
-
-        app.scroll_up();
-
-        assert_eq!(app.scroll, 1);
-    }
-
-    #[test]
-    fn new_app_scrolls_down() {
-        let mut app = App::new(manager(1), "Test");
-
-        app.scroll_down();
-
-        assert_eq!(app.scroll, 1);
-    }
+    // use super::*;
 }

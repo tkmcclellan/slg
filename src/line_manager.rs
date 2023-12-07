@@ -2,7 +2,8 @@ use regex::Regex;
 
 pub struct LineManager {
     size: usize,
-    pub lines: Vec<String>,
+    lines: Vec<String>,
+    scroll: usize,
 }
 
 impl LineManager {
@@ -10,6 +11,7 @@ impl LineManager {
         LineManager {
             lines: Vec::new(),
             size,
+            scroll: 0,
         }
     }
 
@@ -19,10 +21,38 @@ impl LineManager {
         }
 
         self.lines.push(new_line);
+
+        if self.scroll > 0 {
+            self.scroll_down(1)
+        }
+    }
+
+    pub fn scroll_up(&mut self, scroll: usize) {
+        if scroll == 0 {
+            return;
+        } else if self.scroll < scroll {
+            self.scroll = 0;
+        } else {
+            self.scroll -= scroll;
+        }
+    }
+
+    pub fn scroll_down(&mut self, scroll: usize) {
+        self.scroll += scroll;
+    }
+
+    pub fn scroll_to_top(&mut self) {
+        self.scroll = 0
+    }
+
+    pub fn scroll_to_bottom(&mut self) {
+        if self.lines.len() > 0 {
+            self.scroll = self.lines.len() - 1
+        }
     }
 
     pub fn filter(&self, filter: &Regex, items: usize) -> Vec<String> {
-        self.lines
+        self.lines[..(self.lines.len() - self.scroll - 1)]
             .iter()
             .cloned()
             .rev()
